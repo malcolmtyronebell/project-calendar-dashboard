@@ -1,22 +1,63 @@
-# Multi-Provider OAuth Dashboard (MB & SS Dashboard)
 
-A full-stack shared calendar dashboard that aggregates events from multiple Google and Microsoft accounts into a unified, color-coded interface. Built with a security-first architecture featuring OAuth2 multi-provider authentication, JWT session management, encrypted token storage, and role-based data isolation.
+**Full-stack shared-schedule dashboard that aggregates events from multiple Google and Microsoft calendars into a single color-coded view — built with OAuth2 (PKCE-ready), JWT sessions, and Supabase Postgres with Row-Level Security.**
 
+![Status](https://img.shields.io/badge/status-active-brightgreen) ![Frontend](https://img.shields.io/badge/frontend-React%2018%20%2B%20Vite-61DAFB) ![Backend](https://img.shields.io/badge/backend-Node.js%20%2B%20Express-339933) ![DB](https://img.shields.io/badge/db-Supabase%20Postgres%20%2B%20RLS-3ECF8E) ![Auth](https://img.shields.io/badge/auth-OAuth2%20%2B%20JWT-orange) ![License](https://img.shields.io/badge/license-MIT-blue)
 
 ---
 
-## Security Architecture Highlights
+## Problem
 
-This project was built to demonstrate real-world application security concepts aligned with CompTIA Security+ and NIST frameworks:
+Households, small teams, and extended families routinely live across **multiple calendar providers** — a Google personal account, a Google Workspace work account, a Microsoft 365 account. Seeing everyone's real availability in one place normally means either switching apps constantly or handing sensitive credentials to a third-party SaaS.
 
-- **OAuth2 Authorization Code Flow** — Implements delegated authorization with Google and Microsoft identity providers, including PKCE-ready architecture, scope management, and automatic token refresh
-- **JWT Authentication** — Stateless session management with signed tokens, expiration enforcement, and Bearer token validation middleware
-- **Encrypted Credential Storage** — Access and refresh tokens stored in PostgreSQL with row-level security policies preventing cross-user data access
-- **Row-Level Security (RLS)** — Supabase RLS policies enforce data isolation at the database layer, mirroring enterprise RBAC patterns
-- **Security Headers** — Helmet.js middleware applies HTTP security headers (X-Content-Type-Options, X-Frame-Options, Strict-Transport-Security, etc.)
-- **Rate Limiting** — Express rate limiter prevents brute-force attacks on API endpoints (100 requests/15 minutes per IP)
-- **CORS Configuration** — Strict origin whitelisting ensures only the authorized frontend can communicate with the backend API
-- **Environment Variable Isolation** — All secrets managed through environment variables, never committed to source control
+## Solution
+
+`mb-ss-dashboard` is a self-hostable app that pulls events from connected Google and Microsoft accounts via each provider's API, normalizes and categorizes them, and renders a unified multi-user calendar — while keeping credentials and tokens inside **your own** Supabase instance with Row-Level Security enforcing per-user isolation.
+
+---
+
+## Architecture
+
+```mermaid
+flowchart LR
+    U[Users] -->|HTTPS| FE[React 18 + Vite SPA<br/>FullCalendar UI<br/>Tailwind]
+    FE -->|JWT Bearer| API[Express API<br/>Helmet • Rate limit • CORS]
+    API -->|OAuth2 Auth Code| GOOG[Google Calendar /<br/>Gmail APIs]
+    API -->|OAuth2 Auth Code| MS[Microsoft Graph]
+    API -->|Row-Level Security| DB[(Supabase Postgres)]
+    CRON[node-cron<br/>15-min sync] --> API
+```
+
+---
+
+## Features
+
+- **Multi-account aggregation** — connect any number of Google and Microsoft accounts per user.
+- **Color-coded users** — distinct color per connected account so conflicts are obvious.
+- **Smart categorization** — events auto-tagged as `work`, `gym`, `appointment`, etc. via user-defined auto-rules.
+- **Month / week / day views** powered by FullCalendar.
+- **Filter by person or category** — instant client-side filtering.
+- **Background sync** — 15-minute incremental `node-cron` job with manual-sync trigger.
+- **Interactive event modal** — view details, source account, and category inline.
+- **Account management** — connect, disconnect, and rename linked accounts from the UI.
+
+---
+
+## Security Architecture
+
+This is the part that makes the project a **security portfolio piece**, not just a calendar app:
+
+| Control | Implementation |
+|---|---|
+| OAuth2 Authorization Code Flow | PKCE-ready; tokens never touch the SPA |
+| Session management | Stateless JWT; short access-token lifetime |
+| Credential storage | Provider refresh tokens stored in Supabase Postgres with encryption at rest |
+| Database authorization | Row-Level Security (RLS) on every table — a user can only read rows they own |
+| HTTP hardening | [Helmet.js](https://helmetjs.github.io/) for standard security headers |
+| Rate limiting | `express-rate-limit` — 100 requests / 15 min per IP |
+| CORS | Origin allowlist, credentials-aware |
+| Secret handling | 12-factor `.env` isolation; no secrets in source |
+
+**Planned hardening**: AES-256 at the application layer for refresh tokens, 2FA on the app's own user accounts, PKCE on all OAuth flows, optional SSO (OIDC) for the app itself.
 
 ---
 
@@ -30,7 +71,6 @@ This project was built to demonstrate real-world application security concepts a
 | Backend | Node.js + Express | REST API server with middleware pipeline |
 | Database | Supabase (PostgreSQL) | Managed database with built-in RLS and real-time subscriptions |
 | Google Integration | googleapis SDK | OAuth2 + Calendar API + Gmail API |
-| Microsoft Integration | @azure/msal-node + Microsoft Graph | OAuth2 + Outlook Calendar + Mail |
 | Auth | JSON Web Tokens (jsonwebtoken) | Stateless authentication |
 | Scheduling | node-cron | Automated periodic calendar sync |
 | Deployment | Vercel (frontend) + Railway (backend) | CI/CD from GitHub with environment isolation |
@@ -391,18 +431,23 @@ curl -X POST http://localhost:3001/api/sync/all \
 - [ ] Token encryption at rest using AES-256
 
 ---
+## Why this is a security portfolio project
 
-## Author
+Even though the surface use case is a calendar dashboard, the interesting work is all defense-adjacent:
 
-**Malcolm Bell**
-- U.S. Navy Veteran (14+ years)
-- Defense Contractor — Surface Fleet Training & Qualification Programs
-- CompTIA Security+ Certified
-- B.S. Cyber Defense and Analysis (in progress)
-- Building toward governance, risk, compliance, and advanced threat defense
+- **Threat modeling** — STRIDE walkthrough of the OAuth surface, the JWT lifecycle, and the multi-tenant data layer.
+- **Data-layer authorization** — RLS moves the authorization boundary out of application code and into the database, eliminating "missing where-clause" bug classes.
+- **Defense in depth** — Helmet + rate limiting + CORS allowlist + RLS + JWT expiration all stack.
+- **Real-world OAuth** — handling refresh tokens, scope narrowing, and consent-screen scope reduction.
 
 ---
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).
+
+---
+
+## Author
+
+**Malcolm T. Bell** — Portfolio: [github.com/malcolmtyronebell](https://github.com/malcolmtyronebell)
